@@ -154,12 +154,16 @@ void PeerManager::loop()
             // Set the distance, direction, and relative altitude of valid peers
             if (loc.fixType != GNSS_FIX_TYPE_NONE && peer->id > 0 && !peer->lost)
             {
-                peer_t *peer = &peers[i];
+                //peer_t *peer = &peers[i];
 
                 GNSSLocation peerLocation{.lat = peer->gps.lat / 1000000.0, .lon = peer->gps.lon / 1000000.0, .alt = (double)peer->gps.alt};
                 peer->distance = gnssManager->horizontalDistanceTo(peerLocation);
                 peer->direction = gnssManager->courseTo(peerLocation);
                 peer->relalt = peerLocation.alt - loc.alt;
+            }
+
+            if (peer->id > 0 && !peer->lost) {
+                this->predictPeer(peer);
             }
         }
         lastUpdate = millis();
@@ -239,3 +243,39 @@ void PeerManager::enableSpoofing(bool enabled)
     this->spoofingPeers = enabled;
 }
 
+void PeerManager::predictPeer(peer_t *peer) {
+    // Zeit seit letztem Update in Sekunden
+    float dt = (millis() - peer->gps_pre_updated) / 1000.0f;
+
+    if (dt <= 0 || dt > 1.0 || peer->gps.groundSpeed <= 0)
+        return;
+
+    // Geschwindigkeitsrichtung in Bogenmaß
+    double courseRad = peer->gps.groundCourse * DEG_TO_RAD;
+
+    // Geschwindigkeit in m/s
+    double speed = peer->gps.groundSpeed;
+
+    // aktuelle Position in Grad
+    double lat = peer->gps.lat / 1000000.0;
+    double lon = peer->gps.lon / 1000000.0;
+
+    // Erd-Radius
+    const double R = 6371000.0;
+
+    // Verschiebung in Metern
+    double dx = speed * cos(courseRad) * dt;
+    double dy = speed * sin(courseRad) * dt;
+
+    // Verschiebung in Grad
+    double dLat = dy / R * RAD_TO_DEG;
+    double dLon = dx / (R * cos(lat * DEG_TO_RAD)) * RAD_TO_DEG;
+
+    // neue vorhergesagte Position
+    peer->gps_pre.lat = (lat + dLat) * 1000000;
+    peer->gps_pre.lon = (lon + dLon) * 1000000;
+    peer->gps_pre.alt = peer->gps.alt;  // Höhe konstant
+
+    peer->gps_pre.groundSpeed = 0.8 * peer->gps_pre.groundSpeed + 0.2 * peer->gps.groundSpeed;
+    peer->gps_pre.groundCourse = 0.8 * peer->gps_pre.groundCourse + 0.2 * peer->gps.groundCourse;
+}

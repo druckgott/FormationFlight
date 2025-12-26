@@ -46,6 +46,7 @@ private:
     peer_t peers[NODES_MAX];
     peer_t spoofedPeers[NODES_MAX];
     peer_t *getSpoofedPeer(uint8_t index);
+    void predictPeer(peer_t *peer);
 
     // When true, MSPManager will inject fake peers
     bool spoofingPeers = false;

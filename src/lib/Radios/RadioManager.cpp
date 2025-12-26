@@ -136,6 +136,10 @@ ReceiveResult RadioManager::receive(const uint8_t *rawPacket, size_t packetSize,
     {
         peer->rssi = int(rssi);
     }
+    // Vorhersage vorbereiten: aktuelle Position sichern
+    peer->gps_pre = peer->gps;
+    peer->gps_pre_updated = millis();
+    
     peer->gps.lat = air_0.lat;// * 100;
     peer->gps.lon = air_0.lon;// * 100;
     peer->gps.alt = air_0.alt; // m
